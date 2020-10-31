@@ -16,9 +16,10 @@ const bodyParser = require('body-parser');
 
 // require local dependencies
 const logger = require('./middleware/logger');
+const { match } = require('assert');
 
 // declare local constants and helper functions
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 const DATA_DIR = 'data';
 const TAG_RE = /#\w+/g;
 const slugToPath = (slug) => {
@@ -33,11 +34,6 @@ const app = express();
 app.use(cors());
 app.use(logger);
 app.use(bodyParser.json());
-// this commented line of code will statically serve the frontend
-// it will not work until you:
-// $ cd client
-// $ yarn install
-// $ yarn build
 app.use('/', express.static(path.join(__dirname, 'client', 'build')));
 
 
@@ -51,9 +47,11 @@ app.get('/api/page/:slug', async (req, res) => {
     const body = await readFile(filename, 'utf-8');
     res.json({ status: 'ok', body });
     // return jsonOK(res, { body });
+    return;
   } catch (e) {
     res.json({ status: 'error', message: 'Page does not exist.' });
     // return jsonError(res, 'Page does not exist.');
+    return;
   }
 });
 
@@ -65,10 +63,12 @@ app.get('/api/page/:slug', async (req, res) => {
 //  failure response: {status: 'error', message: 'Could not write page.'}
 app.post('/api/page/:slug', async (req, res) => {
   const filename = slugToPath(req.params.slug);
+  const contentBody = req.body.body;
   try {
-
+    await writeFile(filename, contentBody, 'utf-8')
+    res.json({ status:'ok'})
   } catch (e) {
-
+    res.json({ status: 'error', message: 'Could not write page' });
   }
 });
 
@@ -79,7 +79,11 @@ app.post('/api/page/:slug', async (req, res) => {
 //  success response: {status:'ok', pages: ['fileName', 'otherFileName']}
 //  failure response: no failure response
 app.get('/api/pages/all', async (req, res) => {
+  const directory = await readDir(DATA_DIR);
 
+  const filenames = directory.map((name) => name.split('.').slice(0, -1).join('.'));
+
+  res.json({ status:'ok', pages:filenames});
 });
 
 
@@ -91,8 +95,27 @@ app.get('/api/pages/all', async (req, res) => {
 //  failure response: no failure response
 app.get('/api/tags/all', async (req, res) => {
 
-});
+  const directory = await readDir(DATA_DIR);
 
+  let tagList = [];
+	for (let file of directory) {
+		const files = await readFile(`${DATA_DIR}/${file}`, 'utf-8');
+    const tag = files.match(TAG_RE);
+    
+		tagList= tagList.concat(tag);
+  }
+  
+  const uniqueTags = tagList.filter((value, index, self) => (self.indexOf(value) === index) && (value !== null));
+
+  const result = [];
+  for (let i = 0; i < uniqueTags.length; i++) {
+    const sum = uniqueTags[i].slice(1);
+    result.push(sum)
+  };
+  
+  res.json({ status: 'ok', tags: result });
+
+});
 
 // GET: '/api/tags/:tag'
 // searches through the contents of each file looking for the :tag
@@ -100,7 +123,20 @@ app.get('/api/tags/all', async (req, res) => {
 //  success response: {status:'ok', tag: 'tagName', pages: ['tagName', 'otherTagName']}
 //  failure response: no failure response
 app.get('/api/tags/:tag', async (req, res) => {
+  const directory = await readDir(DATA_DIR);
+  let tagList = [];
+  const tag = req.params.tag;
 
+  for (let file of directory) {
+    const files = await readFile(`${DATA_DIR}/${file}`, 'utf-8');
+    
+    if(files.includes(tag)) {
+      file = file.split('.').slice(0, -1).join('.');
+      tagList.push(file);
+    }
+
+    res.json({ status: 'ok', tag: tag, pages: tagList });
+  };
 });
 
 
