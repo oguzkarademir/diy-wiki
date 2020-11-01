@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "cd client && npm install && npm run build && cd .. && npm install && node server.js",
     "demo": "node demo.min.js",
     "heroku-postbuild": "cd client && yarn && yarn run build"
+  },
+  "engines": {
+    "node": "14.x"
   },
   "license": "MIT",
   "dependencies": {
